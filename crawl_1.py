@@ -40,7 +40,7 @@ def crawl_category(base_url):
     folder_name = get_folder_name(base_url)
     crawl_folder = os.path.join(folder_name, "crawl")
     os.makedirs(crawl_folder, exist_ok=True)
-    for page_number in range(1, 10):
+    for page_number in range(10, 15):
         success = fetch_and_save_body(base_url, page_number, crawl_folder)
         if not success:
             break

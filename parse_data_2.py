@@ -54,7 +54,21 @@ def process_all_files(input_folder, output_folder):
             print(f"Processing {file_name}...")
             extract_and_group_json(input_file, output_file)
 
+def process_files_from_furniture_list():
+    with open("furniture_list.txt", "r") as file:
+        urls = [line.strip() for line in file if line.strip()]
+
+    for url in urls:
+        folder_name = url.split("/cat/")[1].split("/")[0]
+        input_folder_path = os.path.join(folder_name, "crawl")
+        output_folder_path = os.path.join(folder_name, "parse")
+
+        # Ensure directories exist
+        os.makedirs(input_folder_path, exist_ok=True)
+        os.makedirs(output_folder_path, exist_ok=True)
+
+        process_all_files(input_folder_path, output_folder_path)
+
+
 if __name__ == "__main__":
-    input_folder_path = "sofas-sectionals-fu003/crawl"
-    output_folder_path = "sofas-sectionals-fu003/parse"
-    process_all_files(input_folder_path, output_folder_path)
+    process_files_from_furniture_list()

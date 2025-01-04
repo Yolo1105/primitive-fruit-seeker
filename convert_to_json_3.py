@@ -102,7 +102,20 @@ def process_files(input_dir, output_dir):
             print(f"Finished processing {filename}\n{'-' * 40}")
 
 
+def process_files_from_furniture_list():
+    with open("furniture_list.txt", "r") as file:
+        urls = [line.strip() for line in file if line.strip()]
+
+    for url in urls:
+        folder_name = url.split("/cat/")[1].split("/")[0]
+        input_directory = os.path.join(folder_name, "parse")
+        output_directory = os.path.join(folder_name, "result")
+
+        # Ensure directories exist
+        os.makedirs(input_directory, exist_ok=True)
+        os.makedirs(output_directory, exist_ok=True)
+
+        process_files(input_directory, output_directory)
+
 if __name__ == "__main__":
-    input_directory = "sofas-sectionals-fu003/parse"
-    output_directory = "sofas-sectionals-fu003/result"
-    process_files(input_directory, output_directory)
+    process_files_from_furniture_list()
