@@ -1,61 +1,108 @@
 import os
-import re
 import json
-from bs4 import BeautifulSoup
 
-input_dir = "sofas-sectionals-fu003/parse"
-output_dir = "sofas-sectionals-fu003/result"
-os.makedirs(output_dir, exist_ok=True)
 
-def extract_data(file_content):
-    soup = BeautifulSoup(file_content, "html.parser")
-    result = {}
+def extract_products(content, filename):
+    print(f"Processing content from {filename}")
 
-    main_div = soup.find("div", class_="plp-mastercard")
-    if main_div:
-        result["brand_name"] = main_div.get("data-product-name") or None
-        result["data-ref-id"] = main_div.get("data-ref-id") or None
-        result["data-price"] = main_div.get("data-price") or None
-    else:
-        result["brand_name"] = None
-        result["data-ref-id"] = None
-        result["data-price"] = None
+    results = []
 
-    description_tag = soup.find("span", class_="plp-price-module__description")
-    if description_tag and description_tag.text:
-        result["description"] = description_tag.text.replace("\"", "").strip()
-    else:
-        result["description"] = None
+    start_index = 0
+    while True:
+        product = {}
 
-    href_tag = soup.find("a", href=True)
-    if href_tag and href_tag.get("href"):
-        href = href_tag["href"].strip()
-        result["href"] = href
-        match = re.search(r"/p/(.*)-\d+/", href)
-        if match:
-            result["product_name"] = match.group(1)
+        # Locate <div data-ref-id="
+        start_index = content.find('<div data-ref-id="', start_index)
+        if start_index == -1:
+            break
+
+        # Extract product-id (formerly data-ref-id)
+        start_index += len('<div data-ref-id="')
+        end_index = content.find('"', start_index)
+        product['product-id'] = content[start_index:end_index]
+
+        # Locate class="notranslate plp-price-module__product-name">
+        temp_index = content.find('class="notranslate plp-price-module__product-name">', end_index)
+        if temp_index != -1:
+            temp_index += len('class="notranslate plp-price-module__product-name">')
+            temp_end = content.find('</', temp_index)
+            product['product_name'] = content[temp_index:temp_end].strip()
         else:
-            result["product_name"] = None
-    else:
-        result["href"] = None
-        result["product_name"] = None
+            product['product_name'] = None
 
-    reordered_result = {
-        "product_name": result.get("product_name"),
-        "brand_name": result.get("brand_name"),
-        "data-ref-id": result.get("data-ref-id"),
-        "data-price": result.get("data-price"),
-        "description": result.get("description"),
-        "href": result.get("href")
-    }
-    return reordered_result
+        # Locate class="plp-price__sr-text">Price
+        temp_index = content.find('class="plp-price__sr-text">Price', end_index)
+        if temp_index != -1:
+            temp_index += len('class="plp-price__sr-text">Price')
+            temp_end = content.find('</span>', temp_index)
+            product['data_price'] = content[temp_index:temp_end].strip()
+        else:
+            product['data_price'] = None
 
-for filename in os.listdir(input_dir):
-    input_path = os.path.join(input_dir, filename)
-    if os.path.isfile(input_path):
-        with open(input_path, "r", encoding="utf-8") as file:
-            content = file.read()
-        data = extract_data(content)
-        output_path = os.path.join(output_dir, f"{os.path.splitext(filename)[0]}.json")
-        with open(output_path, "w", encoding="utf-8") as outfile:
-            json.dump(data, outfile, indent=4)
+        # Locate class="plp-product__image-link link"><img src="
+        temp_index = content.find('class="plp-product__image-link link"><img src="', end_index)
+        if temp_index != -1:
+            temp_index += len('class="plp-product__image-link link"><img src="')
+            temp_end = content.find('"', temp_index)
+            product['image_link'] = content[temp_index:temp_end].strip()
+        else:
+            product['image_link'] = None
+
+        # Locate class="plp-price-module__description">
+        temp_index = content.find('class="plp-price-module__description">', end_index)
+        if temp_index != -1:
+            temp_index += len('class="plp-price-module__description">')
+            temp_end = content.find('</', temp_index)
+            product['description'] = content[temp_index:temp_end].strip()
+        else:
+            product['description'] = None
+
+        # Locate <a aria-hidden="true" href="
+        temp_index = content.find('<a aria-hidden="true" href="', end_index)
+        if temp_index != -1:
+            temp_index += len('<a aria-hidden="true" href="')
+            temp_end = content.find('"', temp_index)
+            product['href'] = content[temp_index:temp_end].strip()
+        else:
+            product['href'] = None
+
+        # Add the product to results
+        results.append(product)
+        print(f"Extracted product: {product}")
+
+        # Update start_index to continue parsing after the current product
+        start_index = end_index
+
+    print(f"Final extracted data from {filename}: {json.dumps(results, indent=2)}")
+    return results
+
+
+def process_files(input_dir, output_dir):
+    os.makedirs(output_dir, exist_ok=True)
+
+    for filename in os.listdir(input_dir):
+        if filename.endswith(".json"):
+            input_path = os.path.join(input_dir, filename)
+            output_path = os.path.join(output_dir, filename)
+
+            print(f"Reading file: {input_path}")
+            with open(input_path, "r", encoding="utf-8") as file:
+                content = json.load(file).get("content", "")
+
+            if not content:
+                print(f"File {filename} has no content. Skipping.")
+                continue
+
+            products = extract_products(content, filename)
+
+            print(f"Writing grouped results to: {output_path}")
+            with open(output_path, "w", encoding="utf-8") as output_file:
+                json.dump(products, output_file, indent=4, ensure_ascii=False)
+
+            print(f"Finished processing {filename}\n{'-' * 40}")
+
+
+if __name__ == "__main__":
+    input_directory = "sofas-sectionals-fu003/parse"
+    output_directory = "sofas-sectionals-fu003/result"
+    process_files(input_directory, output_directory)

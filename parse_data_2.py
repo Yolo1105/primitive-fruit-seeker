@@ -1,47 +1,42 @@
 import os
 import json
-from bs4 import BeautifulSoup
 
 def extract_and_group_json(input_file, output_file):
-    with open(input_file, "r", encoding="utf-8") as file:
-        page_data = json.load(file)
+    try:
+        with open(input_file, "r", encoding="utf-8") as file:
+            page_data = json.load(file)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error reading {input_file}: {e}")
+        return
 
     body_content = page_data.get("body_content", "")
-    soup = BeautifulSoup(body_content, "html.parser")
-    result = []
-    start_divs = soup.find_all("div", attrs={"data-ref-id": True})
+    if not body_content:
+        print(f"No body content found in {input_file}")
+        return
 
-    for start_div in start_divs:
-        group = {"content": []}
-        current_node = start_div
-        div_counter = 0
+    # Extract the plain text between the start and end markers
+    start_marker = '<div class=\"plp-product-list__products \">'
+    end_marker = '<a id=\"products-page-'
 
-        while current_node:
-            if current_node.name == "span" and "aria-label" in current_node.attrs:
-                break
+    start_index = body_content.find(start_marker)
+    end_index = body_content.find(end_marker)
 
-            if current_node.name == "div":
-                div_counter += 1
-                if div_counter == 1:
-                    label = "compare"
-                elif div_counter == 2:
-                    label = "image"
-                elif div_counter == 3:
-                    label = "price"
-                else:
-                    label = "div_content"
+    if start_index == -1:
+        print(f"Start marker not found in {input_file}")
+        return
+    if end_index == -1:
+        print(f"End marker not found in {input_file}")
+        return
 
-                subgroup = {label: str(current_node)}
-                group["content"].append(subgroup)
-            else:
-                group["content"].append({"raw_html": str(current_node)})
+    # Include the start marker and exclude the end marker
+    extracted_content = body_content[start_index:end_index]
 
-            current_node = current_node.find_next_sibling()
-
-        result.append(group)
-
-    with open(output_file, "w", encoding="utf-8") as output_file:
-        json.dump(result, output_file, indent=4, ensure_ascii=False)
+    try:
+        with open(output_file, "w", encoding="utf-8") as file:
+            json.dump({"content": extracted_content}, file, indent=4, ensure_ascii=False)
+        print(f"Extracted content saved to {output_file}")
+    except Exception as e:
+        print(f"Error saving to {output_file}: {e}")
 
 def process_all_files(input_folder, output_folder):
     if os.path.exists(output_folder):
@@ -56,9 +51,10 @@ def process_all_files(input_folder, output_folder):
         if file_name.endswith(".json"):
             input_file = os.path.join(input_folder, file_name)
             output_file = os.path.join(output_folder, file_name)
+            print(f"Processing {file_name}...")
             extract_and_group_json(input_file, output_file)
 
-input_folder_path = "sofas-sectionals-fu003/crawl"
-output_folder_path = "sofas-sectionals-fu003/parse"
-
-process_all_files(input_folder_path, output_folder_path)
+if __name__ == "__main__":
+    input_folder_path = "sofas-sectionals-fu003/crawl"
+    output_folder_path = "sofas-sectionals-fu003/parse"
+    process_all_files(input_folder_path, output_folder_path)
