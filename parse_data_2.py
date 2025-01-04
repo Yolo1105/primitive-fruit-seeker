@@ -1,36 +1,25 @@
+import os
 import json
 from bs4 import BeautifulSoup
 
 def extract_and_group_json(input_file, output_file):
-    # Load the JSON content
     with open(input_file, "r", encoding="utf-8") as file:
         page_data = json.load(file)
 
-    # Extract the body content
     body_content = page_data.get("body_content", "")
-
-    # Parse the HTML content
     soup = BeautifulSoup(body_content, "html.parser")
-
-    # Initialize the result list
     result = []
-
-    # Find all <div data-ref-id> and iterate over them
     start_divs = soup.find_all("div", attrs={"data-ref-id": True})
 
     for start_div in start_divs:
-        # Create a new group for each <div data-ref-id>
         group = {"content": []}
         current_node = start_div
-
-        div_counter = 0  # Counter to track <div> positions in the group
+        div_counter = 0
 
         while current_node:
-            # Stop copying if <span aria-label> is found
             if current_node.name == "span" and "aria-label" in current_node.attrs:
                 break
 
-            # Check if the current node is a <div> and assign a subgroup label
             if current_node.name == "div":
                 div_counter += 1
                 if div_counter == 1:
@@ -45,24 +34,31 @@ def extract_and_group_json(input_file, output_file):
                 subgroup = {label: str(current_node)}
                 group["content"].append(subgroup)
             else:
-                # Otherwise, just add the raw HTML of the current node
                 group["content"].append({"raw_html": str(current_node)})
 
-            # Move to the next sibling
             current_node = current_node.find_next_sibling()
 
-        # Add the group to the result list
         result.append(group)
 
-    # Save the result as JSON
     with open(output_file, "w", encoding="utf-8") as output_file:
         json.dump(result, output_file, indent=4, ensure_ascii=False)
 
-    print(f"Extracted content saved to {output_file.name}")
+def process_all_files(input_folder, output_folder):
+    if os.path.exists(output_folder):
+        for file in os.listdir(output_folder):
+            file_path = os.path.join(output_folder, file)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+    else:
+        os.makedirs(output_folder, exist_ok=True)
 
-# Input and output file paths
-input_file_path = "chair/page_14.json"  # Replace with the path to your input JSON file
-output_file_path = "grouped_extracted_content.json"  # Replace with the desired output path
+    for file_name in os.listdir(input_folder):
+        if file_name.endswith(".json"):
+            input_file = os.path.join(input_folder, file_name)
+            output_file = os.path.join(output_folder, file_name)
+            extract_and_group_json(input_file, output_file)
 
-# Run the function
-extract_and_group_json(input_file_path, output_file_path)
+input_folder_path = "sofas-sectionals-fu003/crawl"
+output_folder_path = "sofas-sectionals-fu003/parse"
+
+process_all_files(input_folder_path, output_folder_path)
