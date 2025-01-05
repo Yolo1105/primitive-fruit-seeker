@@ -2,3 +2,4 @@ beautifulsoup4
 selenium
 jsonschema
 lxml 
+pandas
